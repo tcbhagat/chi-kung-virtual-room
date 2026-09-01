@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#071711">
+  <title>Qi Gong Alignment Coach</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Private · On-device posture analysis</p>
+        <h1>Qi Gong Alignment Coach</h1>
+      </div>
+      <span id="engine-state" class="state-pill" data-state="idle">Ready</span>
+    </header>
+
+    <section class="camera-card" aria-label="Live posture camera">
+      <div id="camera-stage" class="camera-stage">
+        <video id="input-video" class="mirrored" playsinline muted aria-label="Live webcam feed"></video>
+        <canvas id="pose-canvas" class="mirrored" aria-label="Detected pose skeleton"></canvas>
+
+        <aside class="hud" aria-label="Live posture measurements">
+          <div><span>FPS</span><strong id="hud-fps">—</strong></div>
+          <div><span>Spine</span><strong id="hud-spine">—</strong></div>
+          <div><span>Left knee</span><strong id="hud-left-knee">—</strong></div>
+          <div><span>Right knee</span><strong id="hud-right-knee">—</strong></div>
+          <div><span>Confidence</span><strong id="hud-confidence">—</strong></div>
+        </aside>
+
+        <div id="empty-state" class="empty-state">
+          <div class="breath-mark" aria-hidden="true"></div>
+          <h2>Stand where your full body is visible</h2>
+          <p>Use a well-lit space and place the camera at approximately waist height.</p>
+        </div>
+      </div>
+
+      <div class="feedback-bar">
+        <div>
+          <span class="feedback-label">Live guidance</span>
+          <strong id="feedback-message" aria-live="polite">Camera is off</strong>
+        </div>
+        <button id="camera-toggle" type="button">Start camera</button>
+      </div>
+    </section>
+
+    <section class="legend" aria-label="Alignment color legend">
+      <span><i class="good"></i>Good: spine under 5°</span>
+      <span><i class="warning"></i>Warning: spine 5°–12°</span>
+      <span><i class="poor"></i>Poor: spine over 12°</span>
+    </section>
+
+    <p class="privacy-note">Video stays in this browser and is not uploaded.</p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="alignment_engine.js"></script>
+</body>
+</html>
