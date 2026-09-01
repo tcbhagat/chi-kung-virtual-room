@@ -91,11 +91,16 @@
     confidence: document.getElementById('hud-confidence')
   };
   let pose;
-  let camera;
+  let stream;
   let running = false;
+  let processing = false;
+  let frameRequest = 0;
+  let lastFrameSentAt = 0;
   let frameCount = 0;
   let fps = 0;
   let fpsWindowStart = performance.now();
+  const TARGET_FRAME_MS = 1000 / 30;
+  const CAMERA_RETRY_DELAYS = [0, 700, 1400];
 
   function formatAngle(value) {
     return Number.isFinite(value) ? `${value.toFixed(1)}°` : '—';
@@ -154,6 +159,48 @@
     feedback.dataset.level = metrics.spineStatus.level;
   }
 
+  function wait(milliseconds) {
+    return new Promise(resolve => setTimeout(resolve, milliseconds));
+  }
+
+  function cameraErrorMessage(error) {
+    if (error?.name === 'NotAllowedError' || error?.name === 'SecurityError') {
+      return 'Camera is blocked. In Chrome Site settings, set Camera to Allow.';
+    }
+    if (error?.name === 'NotFoundError' || error?.name === 'OverconstrainedError') {
+      return 'Front camera was not found. Check Android camera access.';
+    }
+    if (error?.name === 'NotReadableError' || error?.name === 'AbortError') {
+      return 'Camera is busy. Close Camera, Meet or WhatsApp and try again.';
+    }
+    return `Camera could not start (${error?.name || 'unknown error'}). Reload and try again.`;
+  }
+
+  async function openCamera() {
+    let lastError;
+    for (const delay of CAMERA_RETRY_DELAYS) {
+      if (delay) await wait(delay);
+      try {
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: { ideal: 'user' },
+            width: { ideal: 720 },
+            height: { ideal: 1280 },
+            frameRate: { ideal: 30, max: 30 }
+          }
+        });
+        const track = mediaStream.getVideoTracks()[0];
+        if (!track || track.readyState !== 'live') throw new DOMException('No live video track', 'NotReadableError');
+        return mediaStream;
+      } catch (error) {
+        lastError = error;
+        if (error?.name !== 'NotReadableError' && error?.name !== 'AbortError') break;
+      }
+    }
+    throw lastError || new Error('Camera could not start');
+  }
+
   function onResults(results) {
     resizeCanvas();
     frameCount += 1;
@@ -183,40 +230,74 @@
     updateFeedback(metrics);
   }
 
+  async function processFrame(now) {
+    if (!running) return;
+    frameRequest = requestAnimationFrame(processFrame);
+    if (processing || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || now - lastFrameSentAt < TARGET_FRAME_MS) return;
+    processing = true;
+    lastFrameSentAt = now;
+    try {
+      await pose.send({ image: video });
+    } catch (error) {
+      console.error('MediaPipe frame processing failed:', error);
+      stopCamera();
+      setState('error', 'Pose error');
+      feedback.textContent = 'Pose model stopped. Check internet access and reload.';
+      feedback.dataset.level = 'poor';
+    } finally {
+      processing = false;
+    }
+  }
+
   async function startCamera() {
     if (!window.isSecureContext && location.hostname !== 'localhost') {
       throw new Error('Camera access requires HTTPS or localhost.');
     }
-    if (typeof Pose !== 'function' || typeof Camera !== 'function') {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error('This browser does not provide camera access. Update Chrome.');
+    }
+    if (typeof Pose !== 'function') {
       throw new Error('MediaPipe could not load. Check your internet connection and reload.');
     }
-    setState('loading', 'Loading model');
+    setState('loading', 'Opening camera');
     toggle.disabled = true;
+    feedback.textContent = 'Opening the front camera…';
+
+    stream = await openCamera();
+    video.srcObject = stream;
+    video.muted = true;
+    video.playsInline = true;
+    await video.play();
+    emptyState.hidden = true;
+    feedback.textContent = 'Camera active · loading pose model…';
+
     pose = new Pose({
       locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${file}`
     });
     pose.setOptions({
-      modelComplexity: 1, smoothLandmarks: true, enableSegmentation: false,
-      minDetectionConfidence: 0.6, minTrackingConfidence: 0.6
+      modelComplexity: 0, smoothLandmarks: true, enableSegmentation: false,
+      minDetectionConfidence: 0.55, minTrackingConfidence: 0.55
     });
     pose.onResults(onResults);
-    camera = new Camera(video, {
-      onFrame: async () => pose.send({ image: video }), width: 1280, height: 720
-    });
-    await camera.start();
     running = true;
-    emptyState.hidden = true;
     toggle.textContent = 'Stop camera';
     toggle.disabled = false;
     setState('active', 'Tracking');
-    feedback.textContent = 'Finding your pose…';
+    feedback.textContent = 'Camera active · finding your pose…';
+    frameRequest = requestAnimationFrame(processFrame);
   }
 
   function stopCamera() {
-    camera?.stop();
-    video.srcObject?.getTracks().forEach(track => track.stop());
-    context.clearRect(0, 0, canvas.width, canvas.height);
     running = false;
+    processing = false;
+    cancelAnimationFrame(frameRequest);
+    frameRequest = 0;
+    stream?.getTracks().forEach(track => track.stop());
+    stream = undefined;
+    video.srcObject = null;
+    if (pose?.close) Promise.resolve(pose.close()).catch(() => {});
+    pose = undefined;
+    context.clearRect(0, 0, canvas.width, canvas.height);
     emptyState.hidden = false;
     toggle.textContent = 'Start camera';
     setState('idle', 'Ready');
@@ -235,7 +316,7 @@
       console.error(error);
       stopCamera();
       setState('error', 'Camera error');
-      feedback.textContent = error.message;
+      feedback.textContent = error instanceof DOMException ? cameraErrorMessage(error) : error.message;
       feedback.dataset.level = 'poor';
       toggle.disabled = false;
     }
