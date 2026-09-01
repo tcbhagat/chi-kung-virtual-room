@@ -38,7 +38,9 @@ function serve(request, response) {
     response.end(JSON.stringify({ ok: true, rooms: rooms.size }));
     return;
   }
-  const requested = requestUrl.pathname === '/' ? '/room.html' : requestUrl.pathname;
+  // The primary Galaxy Tab experience is the visible 2D camera coach.
+  // The optional shared 3D room remains available explicitly at /room.html.
+  const requested = requestUrl.pathname === '/' ? '/index.html' : requestUrl.pathname;
   const resolved = path.resolve(ROOT, `.${decodeURIComponent(requested)}`);
   if (!resolved.startsWith(`${ROOT}${path.sep}`)) {
     response.writeHead(403).end('Forbidden');
@@ -133,7 +135,7 @@ io.on('connection', socket => {
 });
 
 webServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`Qi Gong WebXR room: http://localhost:${PORT}`);
+  console.log(`Qi Gong browser coach: http://localhost:${PORT}`);
 });
 
 function shutdown() {
