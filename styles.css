@@ -87,7 +87,8 @@ h1 { margin: 0; font-size: clamp(1.5rem, 4vw, 2.5rem); letter-spacing: -.035em; 
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: #020705;
 }
 
 #pose-canvas { pointer-events: none; }
@@ -184,7 +185,7 @@ h1 { margin: 0; font-size: clamp(1.5rem, 4vw, 2.5rem); letter-spacing: -.035em; 
   .app-header { align-items: center; }
   .eyebrow { font-size: .64rem; }
   .camera-card { border-radius: 18px; }
-  .camera-stage { aspect-ratio: 3 / 4; }
+  .camera-stage { aspect-ratio: 9 / 16; max-height: 72svh; }
   .feedback-bar { align-items: stretch; flex-direction: column; }
   #camera-toggle { width: 100%; }
 }
