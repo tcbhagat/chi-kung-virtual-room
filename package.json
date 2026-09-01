@@ -1,0 +1,25 @@
+{
+  "name": "qigong-telemetry-harness",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dependency-free MediaPipe pose schema and local WebSocket latency harness",
+  "main": "latency_runner.js",
+  "scripts": {
+    "start": "node latency_runner.js",
+    "simulate": "node mock_telemetry.js",
+    "test:10": "CLIENTS=10 DURATION_S=10 node latency_runner.js",
+    "room": "node server.js",
+    "build": "node build_static.js",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist --dotfiles"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "gh-pages": "^6.3.0"
+  }
+}
